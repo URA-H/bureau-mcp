@@ -59,6 +59,8 @@ my-bureau/
 
 ## 提供している tools
 
+### Read 系（Phase 1）
+
 | ツール名 | 説明 |
 |---|---|
 | `bureau_list_departments` | Bureau ルート配下の部署一覧（フォルダ名 / 役割 / サブフォルダ） |
@@ -67,7 +69,15 @@ my-bureau/
 | `bureau_search_notes` | 大文字小文字を区別しない grep。スニペット + 行番号付き |
 | `bureau_get_today` | 今日の digest（部署ごとの open/done TODO 数、inbox/decisions/learnings の有無） |
 
-Phase 1 は **read-only** で固定しています。書き込み（`bureau_add_todo` 等）は Phase 2 で予定。
+### Write 系（Phase 2）
+
+| ツール名 | 説明 |
+|---|---|
+| `bureau_add_todo` | 指定部署の TODO ファイル（`todos/YYYY-MM-DD.md`）に 1 行追記。ファイルが無ければ作る |
+| `bureau_complete_todo` | 指定部署 × 指定日の TODO のうち、テキストマッチした最初の open 行を `[ ]` → `[x]` に |
+| `bureau_append_to_today` | 今日の `inbox/YYYY-MM-DD.md` / `notes/YYYY-MM-DD-decisions.md` / `notes/YYYY-MM-DD-learnings.md` にタイムスタンプ付きで追記 |
+
+すべての write 系は **append-only** で、既存行を delete または overwrite しません（complete_todo の checkbox flip を除く）。
 
 ---
 
@@ -223,10 +233,11 @@ pnpm inspect       # MCP Inspector で対話的に検査
 
 ## 今後の予定
 
-- Phase 2: write 系ツール（`bureau_add_todo` / `bureau_complete_todo` / `bureau_append_to_today`）
+- ✅ ~~Phase 2: write 系ツール~~（2026-06-07 出荷済み）
 - Phase 3: 部署提案（「リサーチが続いたから research 部門を作る？」のような パターン検出）
 - Phase 4: スキーマを汎用化（CLAUDE.md 以外の schema source、例えば `bureau.config.json` への対応）
 - 検索を ripgrep にスイッチするオプション
+- 履歴管理: write 操作の差分ログを `.bureau-log/` に蓄積
 
 ---
 
@@ -242,5 +253,6 @@ pnpm inspect       # MCP Inspector で対話的に検査
 ## ライセンス・注意事項
 
 - 本プロジェクトは学習・個人開発目的のものです
-- read-only 設計のため、Claude がユーザーのファイルを書き換えることはありません（Phase 1 時点）
+- Phase 2 で write 系ツールが入りましたが、すべて **append-only** 設計です（`bureau_complete_todo` の checkbox flip を除き、既存行の削除/上書きは行いません）
+- 書き込み先は **`BUREAU_ROOT` の中だけ**。パストラバーサルガードで `..` を含むパスは弾きます
 - `BUREAU_ROOT` の中身は **ローカルにとどまります**。MCP サーバーがネットワーク経由でどこかに送ることはありません

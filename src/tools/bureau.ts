@@ -14,6 +14,11 @@ import { z } from "zod";
 import { readNote, searchNotes } from "../lib/fs.js";
 import { todayStringLocal } from "../lib/parsers.js";
 import { getTodayDigest, listTodos } from "../lib/queries.js";
+import {
+  addTodo,
+  appendToToday,
+  completeTodo,
+} from "../lib/writers.js";
 import type { BureauSchema } from "../lib/types.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -195,6 +200,125 @@ export function registerBureauTools(
           args.date ?? todayStringLocal(),
         );
         return asJson(digest);
+      } catch (e) {
+        return asError(e);
+      }
+    },
+  );
+
+  // ──────────────────────────────────────────────
+  // bureau_add_todo (Phase 2)
+  // ──────────────────────────────────────────────
+  server.registerTool(
+    "bureau_add_todo",
+    {
+      title: "bureau: add a TODO line",
+      description:
+        "指定部署の TODO ファイル（YYYY-MM-DD.md）に 1 行追記する。ファイルが無ければ作る。重要: 既存行は変更しない append-only。",
+      inputSchema: z.object({
+        department: z
+          .string()
+          .describe("対象部署のフォルダ名（例: secretary）"),
+        text: z.string().min(1).describe("TODO 内容"),
+        date: z
+          .string()
+          .regex(DATE_RE)
+          .optional()
+          .describe("YYYY-MM-DD。省略時は今日"),
+        priority: z
+          .string()
+          .optional()
+          .describe("優先度ラベル（例: 高 / 通常 / 低）"),
+        due: z
+          .string()
+          .regex(DATE_RE)
+          .optional()
+          .describe("期限日（YYYY-MM-DD）"),
+      }).shape,
+    },
+    async (args) => {
+      try {
+        const result = await addTodo(schema, args.department, args.text, {
+          date: args.date,
+          priority: args.priority,
+          due: args.due,
+        });
+        return asJson(result);
+      } catch (e) {
+        return asError(e);
+      }
+    },
+  );
+
+  // ──────────────────────────────────────────────
+  // bureau_complete_todo (Phase 2)
+  // ──────────────────────────────────────────────
+  server.registerTool(
+    "bureau_complete_todo",
+    {
+      title: "bureau: mark a TODO as done",
+      description:
+        "指定部署の指定日の TODO のうち、textMatch を含む最初の open 行を `[ ]` → `[x]` に変える。マッチしない場合は no-op。",
+      inputSchema: z.object({
+        department: z.string().describe("対象部署のフォルダ名"),
+        textMatch: z
+          .string()
+          .min(1)
+          .describe("完了させたい TODO に含まれる文字列（大文字小文字区別なし、最初の 1 件のみ）"),
+        date: z
+          .string()
+          .regex(DATE_RE)
+          .optional()
+          .describe("YYYY-MM-DD。省略時は今日"),
+      }).shape,
+    },
+    async (args) => {
+      try {
+        const result = await completeTodo(
+          schema,
+          args.department,
+          args.textMatch,
+          args.date ?? todayStringLocal(),
+        );
+        return asJson(result);
+      } catch (e) {
+        return asError(e);
+      }
+    },
+  );
+
+  // ──────────────────────────────────────────────
+  // bureau_append_to_today (Phase 2)
+  // ──────────────────────────────────────────────
+  server.registerTool(
+    "bureau_append_to_today",
+    {
+      title: "bureau: append to inbox/decisions/learnings",
+      description:
+        "今日の inbox / decisions / learnings ファイルに 1 セクション分追記する。ファイルが無ければ最小ヘッダで作る。タイムスタンプ付きセクションで区切る。",
+      inputSchema: z.object({
+        department: z.string().describe("対象部署のフォルダ名"),
+        kind: z
+          .enum(["inbox", "decisions", "learnings"])
+          .describe("追記先（inbox/decisions/learnings）"),
+        content: z.string().min(1).describe("追記する内容（Markdown）"),
+        date: z
+          .string()
+          .regex(DATE_RE)
+          .optional()
+          .describe("YYYY-MM-DD。省略時は今日"),
+      }).shape,
+    },
+    async (args) => {
+      try {
+        const result = await appendToToday(
+          schema,
+          args.department,
+          args.kind,
+          args.content,
+          args.date ?? todayStringLocal(),
+        );
+        return asJson(result);
       } catch (e) {
         return asError(e);
       }
